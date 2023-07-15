@@ -2,7 +2,7 @@
 
 
 <p align="center">
-  <img src="wcg.png">
+  <img src="screenshoot.png">
 </p>
 
 Try it here :

@@ -4,7 +4,7 @@ Browser-based, offline-capable, client-side, trustless
 
 Try it here :
 
-[New_WG_User.html]([https://github.com/jcarrano/wg-keygen-notrust](https://htmlpreview.github.io/?https://github.com/seb1k/Wireguard-Client-Generator/blob/main/New_WG_User.html))
+[https://github.com/jcarrano/wg-keygen-notrust](https://htmlpreview.github.io/?https://github.com/seb1k/Wireguard-Client-Generator/blob/main/New_WG_User.html)](New_WG_User.html)
 
 
 Based on :

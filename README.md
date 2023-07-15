@@ -1,8 +1,9 @@
-## Wireguard Client Generator
+# Wireguard Client Generator
 
-<center>
-![screenshot](wcg.png)
-</center>
+
+<p align="center">
+  <img src="wcg.png">
+</p>
 
 Try it here :
 

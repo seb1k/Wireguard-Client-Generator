@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang=en>
+
+<head>
+<title>Wireguard Client Generator</title>
+
+<script>
+(new URL(window.location.href)).searchParams.forEach((x, y) => {
+    let el = document.getElementById(y);
+    if (el)
+        el.value = x;
+});
+
+function genCfg_pre(new_client)
+{
+if(new_client)
+	xyzid.value++;
+
+client_conf.classList.add("menu_show");
+server_conf.classList.add("menu_show");
+xyzid.classList.add("menu_show");
+setTimeout(function(){client_conf.classList.remove("menu_show");server_conf.classList.remove("menu_show");xyzid.classList.remove("menu_show");}, 300);
+
+
+//CLIENT_LAST_IP
+var oldip = ca.value
+var oldname = cn.value
+cn.value=oldname.replace('[CLIENT_LAST_IP]', xyzid.value)
+ca.value=oldip.replace('[CLIENT_LAST_IP]', xyzid.value)
+genCfg()
+
+
+
+
+cn.value=oldname
+ca.value=oldip
+}
+
+function save_localStorage()
+{
+
+localStorage.setItem("wg-xyzid", xyzid.value);
+
+localStorage.setItem("wg-sa", sa.value);
+localStorage.setItem("wg-sp", sp.value);
+localStorage.setItem("wg-sk",sk.value );
+localStorage.setItem("wg-ca", ca.value);
+localStorage.setItem("wg-aa", aa.value);
+
+localStorage.setItem("wg-cn", cn.value);
+localStorage.setItem("wg-ka", ka.value);
+localStorage.setItem("wg-dns",dns.value );
+localStorage.setItem("wg-mtu",mtu.value );
+localStorage.setItem("wg-ispsk", ispsk.checked);
+}
+
+function load_localStorage()
+{
+
+if(!localStorage.getItem("wg-sa")) return; // nothing in localStorage
+
+xyzid.value	=	localStorage.getItem("wg-xyzid");
+
+sa.value	=	localStorage.getItem("wg-sa");
+sp.value	=	localStorage.getItem("wg-sp");
+sk.value	=	localStorage.getItem("wg-sk");
+ca.value	=	localStorage.getItem("wg-ca");
+aa.value	=	localStorage.getItem("wg-aa");
+
+cn.value	=	localStorage.getItem("wg-cn");
+ka.value	=	localStorage.getItem("wg-ka");
+dns.value	=	localStorage.getItem("wg-dns");
+mtu.value	=	localStorage.getItem("wg-mtu");
+ispsk.checked=	(localStorage.getItem("wg-ispsk")=="true");
+}
+
+function upd_clientsubnet()
+{
+clientsubnet.innerHTML = ca.value.replace('[CLIENT_LAST_IP]', "")
+}
+
+function genCfg() {
+    let results = document.getElementById('results');
+    results.setAttribute("style", "");
+    let kp = wireguard.generateKeypair();
+    
+	
+
+	let psk = wireguard.generatePresharedKey();
+
+	
+    let fd = new FormData(document.getElementById('params'));
+    let clientcfg = [
+        "[Interface]",
+        "PrivateKey = "+kp.privateKey,
+        "Address = "+fd.get("ca")+"/32",
+		fd.get("dns")? ("DNS = "+fd.get("dns")) : "",
+		fd.get("mtu")? ("MTU = "+fd.get("mtu")) : "",
+        "[Peer]",
+        "Endpoint = "+fd.get("sa")+":"+fd.get("sp"),
+        "PublicKey = "+fd.get("sk"),
+
+		(fd.get("ka") > 0)? ("PersistentKeepalive = "+fd.get("ka")) : "",
+        "AllowedIPs = "+fd.get("aa"),
+        (ispsk.checked)? "PresharedKey = "+psk : ""].filter(line => line.trim() !== '').join("\n");
+    let client_dl = document.getElementById('client-dl');
+	
+	client_conf.innerHTML = clientcfg
+    client_dl.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(clientcfg));
+    client_dl.setAttribute("download", "WG-user_"+fd.get("cn")+".conf")
+    let serverfrag = [
+        "[Peer]",
+        (fd.get("cn")? "# "+fd.get("cn") : ""),
+        "PublicKey = "+kp.publicKey,
+		"AllowedIPs = "+fd.get("ca")+"/32",
+		(ispsk.checked)? "PresharedKey = "+psk : ""].filter(line => line.trim() !== '').join("\n");
+    let server_dl = document.getElementById('server-dl');
+    let encodedfrag = encodeURIComponent(serverfrag);
+	
+	server_conf.innerHTML = serverfrag
+	
+	
+    server_dl.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodedfrag);
+    server_dl.setAttribute("download", "WG-server_"+(fd.get("cn")? fd.get("cn") : "peer")+".conf")
+
+
+    results.setAttribute("style", "display: inherit");
+}
+
+/*! SPDX-License-Identifier: GPL-2.0
+ *
+ * Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ */
+
+(function() {
+	function gf(init) {
+		var r = new Float64Array(16);
+		if (init) {
+			for (var i = 0; i < init.length; ++i)
+				r[i] = init[i];
+		}
+		return r;
+	}
+
+	function pack(o, n) {
+		var b, m = gf(), t = gf();
+		for (var i = 0; i < 16; ++i)
+			t[i] = n[i];
+		carry(t);
+		carry(t);
+		carry(t);
+		for (var j = 0; j < 2; ++j) {
+			m[0] = t[0] - 0xffed;
+			for (var i = 1; i < 15; ++i) {
+				m[i] = t[i] - 0xffff - ((m[i - 1] >> 16) & 1);
+				m[i - 1] &= 0xffff;
+			}
+			m[15] = t[15] - 0x7fff - ((m[14] >> 16) & 1);
+			b = (m[15] >> 16) & 1;
+			m[14] &= 0xffff;
+			cswap(t, m, 1 - b);
+		}
+		for (var i = 0; i < 16; ++i) {
+			o[2 * i] = t[i] & 0xff;
+			o[2 * i + 1] = t[i] >> 8;
+		}
+	}
+
+	function carry(o) {
+		var c;
+		for (var i = 0; i < 16; ++i) {
+			o[(i + 1) % 16] += (i < 15 ? 1 : 38) * Math.floor(o[i] / 65536);
+			o[i] &= 0xffff;
+		}
+	}
+
+	function cswap(p, q, b) {
+		var t, c = ~(b - 1);
+		for (var i = 0; i < 16; ++i) {
+			t = c & (p[i] ^ q[i]);
+			p[i] ^= t;
+			q[i] ^= t;
+		}
+	}
+
+	function add(o, a, b) {
+		for (var i = 0; i < 16; ++i)
+			o[i] = (a[i] + b[i]) | 0;
+	}
+
+	function subtract(o, a, b) {
+		for (var i = 0; i < 16; ++i)
+			o[i] = (a[i] - b[i]) | 0;
+	}
+
+	function multmod(o, a, b) {
+		var t = new Float64Array(31);
+		for (var i = 0; i < 16; ++i) {
+			for (var j = 0; j < 16; ++j)
+				t[i + j] += a[i] * b[j];
+		}
+		for (var i = 0; i < 15; ++i)
+			t[i] += 38 * t[i + 16];
+		for (var i = 0; i < 16; ++i)
+			o[i] = t[i];
+		carry(o);
+		carry(o);
+	}
+
+	function invert(o, i) {
+		var c = gf();
+		for (var a = 0; a < 16; ++a)
+			c[a] = i[a];
+		for (var a = 253; a >= 0; --a) {
+			multmod(c, c, c);
+			if (a !== 2 && a !== 4)
+				multmod(c, c, i);
+		}
+		for (var a = 0; a < 16; ++a)
+			o[a] = c[a];
+	}
+
+	function clamp(z) {
+		z[31] = (z[31] & 127) | 64;
+		z[0] &= 248;
+	}
+
+	function generatePublicKey(privateKey) {
+		var r, z = new Uint8Array(32);
+		var a = gf([1]),
+			b = gf([9]),
+			c = gf(),
+			d = gf([1]),
+			e = gf(),
+			f = gf(),
+			_121665 = gf([0xdb41, 1]),
+			_9 = gf([9]);
+		for (var i = 0; i < 32; ++i)
+			z[i] = privateKey[i];
+		clamp(z);
+		for (var i = 254; i >= 0; --i) {
+			r = (z[i >>> 3] >>> (i & 7)) & 1;
+			cswap(a, b, r);
+			cswap(c, d, r);
+			add(e, a, c);
+			subtract(a, a, c);
+			add(c, b, d);
+			subtract(b, b, d);
+			multmod(d, e, e);
+			multmod(f, a, a);
+			multmod(a, c, a);
+			multmod(c, b, e);
+			add(e, a, c);
+			subtract(a, a, c);
+			multmod(b, a, a);
+			subtract(c, d, f);
+			multmod(a, c, _121665);
+			add(a, a, d);
+			multmod(c, c, a);
+			multmod(a, d, f);
+			multmod(d, b, _9);
+			multmod(b, e, e);
+			cswap(a, b, r);
+			cswap(c, d, r);
+		}
+		invert(c, c);
+		multmod(a, a, c);
+		pack(z, a);
+		return z;
+	}
+
+	function generatePresharedKey() {
+		var privateKey = new Uint8Array(32);
+		window.crypto.getRandomValues(privateKey);
+		return privateKey;
+	}
+
+	function generatePrivateKey() {
+		var privateKey = generatePresharedKey();
+		clamp(privateKey);
+		return privateKey;
+	}
+
+	function encodeBase64(dest, src) {
+		var input = Uint8Array.from([(src[0] >> 2) & 63, ((src[0] << 4) | (src[1] >> 4)) & 63, ((src[1] << 2) | (src[2] >> 6)) & 63, src[2] & 63]);
+		for (var i = 0; i < 4; ++i)
+			dest[i] = input[i] + 65 +
+			(((25 - input[i]) >> 8) & 6) -
+			(((51 - input[i]) >> 8) & 75) -
+			(((61 - input[i]) >> 8) & 15) +
+			(((62 - input[i]) >> 8) & 3);
+	}
+
+	function keyToBase64(key) {
+		var i, base64 = new Uint8Array(44);
+		for (i = 0; i < 32 / 3; ++i)
+			encodeBase64(base64.subarray(i * 4), key.subarray(i * 3));
+		encodeBase64(base64.subarray(i * 4), Uint8Array.from([key[i * 3 + 0], key[i * 3 + 1], 0]));
+		base64[43] = 61;
+		return String.fromCharCode.apply(null, base64);
+	}
+
+	window.wireguard = {
+		generatePresharedKey: function() {
+			return keyToBase64(generatePresharedKey());
+		},
+		generateKeypair: function() {
+			var privateKey = generatePrivateKey();
+			var publicKey = generatePublicKey(privateKey);
+			return {
+				publicKey: keyToBase64(publicKey),
+				privateKey: keyToBase64(privateKey)
+			};
+		}
+	};
+})();
+
+</script>
+	<style>
+		body{margin:40px
+		auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;padding:0
+		10px;
+		background-color: #eee;
+		}
+		h1,h2,h3{line-height:1.2}
+		h2 {font-size:large;}
+		div {padding: 1ex; margin-top: 1ex;}
+		div.adm {background-color: rgb(255, 231, 231);}
+		div.usr {text-align: center;}
+		#gen {background-color: rgb(248, 206, 69);}
+		#results {display: none; background-color: rgb(91, 241, 136);}
+		
+		.menu_show{
+		animation: opacity_0_to_1 .3s;
+		}
+
+@keyframes opacity_0_to_1 {
+	from {opacity:.2;}
+	to {opacity:1;}
+  }
+  
+  #server_conf,#client_conf{
+  background-color:#fff;
+  white-space: pre;
+  font: caption;
+  font-size:smaller;
+  }
+
+	</style>
+</head>
+
+<body onload="load_localStorage();upd_clientsubnet();genCfg_pre(0);">
+	<h1>Wireguard Client Generator</h1>
+	<div class="xyzid">Client IP : <span id='clientsubnet'>x.y.z.</span><input type="text" id="xyzid" name="xyzid" value="2" size="3" onkeyup="genCfg_pre(0)"><button id="genbtn" onclick="genCfg_pre(1);save_localStorage();" style='margin-left:20px;cursor:pointer;'>Generate new client</button></div>
+	<div class="adm">
+	<details>
+		<summary style='cursor:pointer'>Parameters</summary>
+		<form id="params" method="get">
+		<table style='margin-left:30px;'>
+			<tr><td><label for="sa">Server Address:</label>	</td><td>		<input type="text" id="sa" name="sa" value="example.com"></td></tr>
+			<tr><td><label for="sp">Port:</label>			</td><td>		<input type="number" id="sp" , name="sp" min="1" max="65635" value="51820" placeholder="51820"></td></tr>
+			<tr><td><label for="sk">Server Pubkey:</label>	</td><td>		<input type="text" id="sk" , name="sk" value="SERVER_PUBKEY_HERE"></td></tr>
+			<tr><td><label for="ca">Client IP:</label>	</td><td>		<input type="text" id="ca" name="ca" value="10.0.0.[CLIENT_LAST_IP]"  onchange="upd_clientsubnet()"><br></tr>
+			<tr><td><label for="aa">Allowed Subnet:</label>	</td><td>		<input type="text" id="aa" name="aa" value="0.0.0.0/0, ::/0"></td></tr>
+			<tr><td><br/>Optional :</td><td></td></tr>
+			<tr><td><label for="cn">Client name :</label></td><td>			<input type="text" id="cn" name="cn" value="USER_[CLIENT_LAST_IP]"></td></tr>
+			<tr><td><label for="ka">Keepalive:</label>		</td><td>		<input type="number" id="ka" name="ka" min="0" max="1000" value="0"></td></tr>
+			<tr><td><label for="dns">DNS :</label></td><td>					<input type="text" id="dns" name="dns" value=""></td></tr>
+			<tr><td><label for="mtu">MTU :</label></td><td>					<input type="text" id="mtu" name="mtu" value="" placeholder="1420"></td></tr>
+			<tr><td><label for="ispsk">Pre-shared key:</label></td><td>		<input type="checkbox" id="ispsk" name="ispsk"></td></tr>
+			</table>
+		</form>
+	</details>
+	</div>
+
+	<div id="results">
+			
+		<center style='font-weight:bold;'>Client Configuration :</center>
+		<div id="client_conf"></div>
+		<a id="client-dl">Download </a>
+		<br>
+		<br>
+		<center style='font-weight:bold;'>Server Fragment :</center>
+		<div id="server_conf"></div>
+		<a id="server-dl">Download </a>
+		<br>
+	</div>
+	<div>
+		<details>
+		<summary style='cursor:pointer'>Additional info</summary>
+		<br/><button onclick="localStorage.clear();location.replace('');">Clear saved parameters</button><br/><br/>
+		<p>The parameters are usually set by the server administrator and can be saved in URL's query string. Only the
+			client address and name need to be changed per client. The client name is optional and serves to uniquely
+			label the config fragments sent to the server.</p>
+
+		<p>If this webpage is not used in private mode, the contents of the client config will be stored in the
+			browser's history as the download location of the file.</p>
+
+		<p>NO WARRANTY EXPRESSED OR IMPLIED!!!!</p>
+		
+		<p>This page is based on Juan I Carrano tool : <a href="https://github.com/jcarrano/wg-keygen-notrust">GitHub Repository</a></p>
+		</details>
+	</div>
+	<div class="usr">
+		<p><a href="https://github.com/jcarrano/wg-keygen-notrust">GitHub Repository</a><br></p>
+	</div>
+
+
+</body>
+
+</html>

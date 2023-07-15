@@ -4,7 +4,7 @@ Browser-based, offline-capable, client-side, trustless
 
 Try it here :
 
-[https://github.com/jcarrano/wg-keygen-notrust](https://htmlpreview.github.io/?https://github.com/seb1k/Wireguard-Client-Generator/blob/main/New_WG_User.html)](New_WG_User.html)
+[New_WG_User.html](https://htmlpreview.github.io/?https://github.com/seb1k/Wireguard-Client-Generator/blob/main/New_WG_User.html)
 
 
 Based on :
@@ -16,4 +16,4 @@ Based on :
 - Better UI
 - Single HTML file
 - More option
-- Data save in localstorage for futur use.
+- Data saved in localstorage for futur use.

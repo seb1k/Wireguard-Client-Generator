@@ -1,4 +1,8 @@
+## Wireguard Client Generator
+
+<center>
 ![screenshot](wcg.png)
+</center>
 
 Try it here :
 
